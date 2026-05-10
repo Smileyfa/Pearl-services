@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pearlpay-ingress
+  labels:
+    app: pearlpay
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - host: app.pearlpay.example
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pearlpay-frontend
+                port:
+                  number: 80
+    - host: api.pearlpay.example
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pearlpay-api
+                port:
+                  number: 8000
+    - host: admin.pearlpay.example
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pearlpay-admin-dashboard
+                port:
+                  number: 80

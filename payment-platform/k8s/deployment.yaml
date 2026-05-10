@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pearlpay-api
+  labels:
+    app: pearlpay-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pearlpay-api
+  template:
+    metadata:
+      labels:
+        app: pearlpay-api
+    spec:
+      # // VULN: Kubernetes Security - default service account is used for application pods.
+      serviceAccountName: default
+      # // VULN: Kubernetes Security - application pods run as root.
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: api
+          image: pearlpay/backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: pearlpay-secrets
+          env:
+            - name: APP_ENV
+              value: production
+          # // VULN: Kubernetes Security - main container is privileged.
+          securityContext:
+            privileged: true
+          # // VULN: Kubernetes Security - no CPU or memory resource limits are defined.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pearlpay-frontend
+  labels:
+    app: pearlpay-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pearlpay-frontend
+  template:
+    metadata:
+      labels:
+        app: pearlpay-frontend
+    spec:
+      # // VULN: Kubernetes Security - default service account is used for frontend pods.
+      serviceAccountName: default
+      # // VULN: Kubernetes Security - frontend pods run as root.
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: frontend
+          image: pearlpay/frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5173
+          env:
+            - name: VITE_API_BASE
+              value: https://api.pearlpay.example
+          # // VULN: Kubernetes Security - frontend container is privileged.
+          securityContext:
+            privileged: true
+          # // VULN: Kubernetes Security - no CPU or memory resource limits are defined.
