@@ -1,0 +1,50 @@
+name: PearlPay Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  APP_ENV: production
+  # // VULN: CI/CD - AWS credentials are stored as plaintext in the workflow file.
+  AWS_ACCESS_KEY_ID: AKIA0000EXAMPLE
+  AWS_SECRET_ACCESS_KEY: wJalrXexample
+  AWS_DEFAULT_REGION: us-east-1
+  DATABASE_URL: postgresql://payadmin:SuperSecretPassword123!@pearlpay-payments.example:5432/payments
+  JWT_SECRET: secret123
+  OPENAI_API_KEY: sk-proj-realisticTrainingKey1234567890abcdef
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    # // VULN: CI/CD - deploys to production on every push to main with no approval gate.
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Print environment
+        # // VULN: CI/CD - build step prints all environment variables.
+        run: env
+
+      - name: Build backend image
+        run: |
+          cd payment-platform/backend
+          docker build -t pearlpay/backend:${{ github.sha }} .
+
+      - name: Build frontend image
+        run: |
+          cd payment-platform/frontend
+          npm install
+          npm run build
+          docker build -t pearlpay/frontend:${{ github.sha }} .
+
+      # // VULN: CI/CD - no secret scanning step is configured.
+      # // VULN: CI/CD - no SAST scanning step is configured.
+      # // VULN: CI/CD - no dependency scanning step is configured.
+      - name: Deploy to production EKS
+        run: |
+          aws eks update-kubeconfig --name pearlpay-training --region us-east-1
+          kubectl apply -f payment-platform/k8s/
