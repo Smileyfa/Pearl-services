@@ -169,7 +169,7 @@ git log --oneline
 cat .env
 ```
 
-Screenshot: ![.env committed to git](./env-committed.png)
+Screenshot:![.env committed to git](./env-committed.png)
 
 ---
 
