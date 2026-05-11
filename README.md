@@ -1,0 +1,1 @@
+PearlPay is a deliberately vulnerable payment processing platform for DevSecOps learning. It includes user authentication, card payment submission, transaction history, an admin dashboard, merchant webhooks, AI-assisted fraud analysis, local Docker services, Kubernetes manifests, Terraform AWS infrastructure, and CI/CD workflow examples.
