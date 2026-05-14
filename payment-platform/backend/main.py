@@ -61,10 +61,15 @@ def get_redis():
     return redis.Redis(host="redis", port=6379, password=REDIS_PASSWORD, decode_responses=True)
 
 
-def query_db(sql):
+def query_db(sql, params=None):
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql)
+            if params:
+                for index in range(len(params), 0, -1):
+                    sql = sql.replace(f"${index}", "%s")
+                cur.execute(sql, params)
+            else:
+                cur.execute(sql)
             if cur.description:
                 return cur.fetchall()
             return []
@@ -228,9 +233,9 @@ async def login(request: Request):
     email = payload.get("email", "")
     password = payload.get("password", "")
     # // VULN: Broken Authentication - no rate limiting or lockout is implemented for login attempts.
-    # // VULN: SQL Injection - raw string concatenation is used in the login query.
-    sql = f"SELECT * FROM users WHERE email = '{email}' AND password = '{password}'"
-    users = query_db(sql)
+    # // FIXED: SQL Injection - login query now uses parameterised $1/$2 placeholders instead of raw string concatenation.
+    sql = "SELECT * FROM users WHERE email = $1 AND password = $2"
+    users = query_db(sql, (email, password))
     if not users:
         raise HTTPException(status_code=401, detail="Invalid email/password for users.password")
     user = users[0]
@@ -282,9 +287,9 @@ async def submit_payment(request: Request, authorization: str | None = Header(de
 @app.get("/api/transactions")
 def list_my_transactions(authorization: str | None = Header(default=None), merchant: str = ""):
     user = decode_user(authorization)
-    # // VULN: SQL Injection - raw string concatenation is used in the transaction search query.
-    sql = f"SELECT * FROM transactions WHERE user_id = {user['sub']} AND merchant ILIKE '%{merchant}%' ORDER BY created_at DESC"
-    rows = query_db(sql)
+    # // FIXED: SQL Injection - transaction search now uses parameterised $1/$2 placeholders instead of raw string concatenation.
+    sql = "SELECT * FROM transactions WHERE user_id = $1 AND merchant ILIKE $2 ORDER BY created_at DESC"
+    rows = query_db(sql, (user["sub"], f"%{merchant}%"))
     return {"transactions": [serialize_transaction(row) for row in rows]}
 
 
