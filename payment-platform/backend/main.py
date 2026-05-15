@@ -19,8 +19,10 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://payadmin:SuperSecretPassword123!@postgres:5432/payments",
 )
-# // VULN: Broken Authentication - JWTs are signed with HS256 using the weak secret "secret123".
-JWT_SECRET = "secret123"
+# // FIXED: Broken Authentication - JWT secret is loaded from the JWT_SECRET environment variable instead of a hardcoded weak value.
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is not set. Refusing to start.")
 # // VULN: Secret Management - OpenAI API key is hardcoded directly in source code.
 OPENAI_API_KEY = "sk-proj-realisticTrainingKey1234567890"
 # // VULN: Secret Management - dummy AWS access key is hardcoded directly in source code.
