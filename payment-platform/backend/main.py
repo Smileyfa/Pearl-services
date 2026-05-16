@@ -306,10 +306,11 @@ def get_transaction(transaction_id: int, authorization: str | None = Header(defa
 
 
 @app.get("/api/admin/transactions")
-def admin_transactions(admin: str = "false"):
-    # // VULN: Broken Access Control - admin access checks only the query parameter ?admin=true.
-    if admin != "true":
-        raise HTTPException(status_code=403, detail="Pass admin=true to access admin dashboard")
+def admin_transactions(authorization: str | None = Header(default=None)):
+    # // FIXED: Broken Access Control - admin access now requires a valid JWT with role=admin instead of ?admin=true.
+    user = decode_user(authorization)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
     rows = query_db("SELECT * FROM transactions ORDER BY created_at DESC")
     return {"transactions": [serialize_transaction(row) for row in rows]}
 
