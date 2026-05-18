@@ -297,9 +297,9 @@ def list_my_transactions(authorization: str | None = Header(default=None), merch
 
 @app.get("/api/transactions/{transaction_id}")
 def get_transaction(transaction_id: int, authorization: str | None = Header(default=None)):
-    decode_user(authorization)
-    # // VULN: IDOR - transaction ownership is not checked before returning a transaction by ID.
-    rows = query_db(f"SELECT * FROM transactions WHERE id = {transaction_id}")
+    user = decode_user(authorization)
+    # // FIXED: IDOR - transaction lookup now requires the transaction ID and authenticated user's ID to match.
+    rows = query_db("SELECT * FROM transactions WHERE id = $1 AND user_id = $2", (transaction_id, user["sub"]))
     if not rows:
         raise HTTPException(status_code=404, detail="transactions.id not found")
     return {"transaction": serialize_transaction(rows[0])}
