@@ -2,7 +2,6 @@ import json
 import os
 import random
 import time
-import traceback
 from datetime import datetime
 
 import jwt
@@ -11,6 +10,7 @@ import psycopg2.extras
 import redis
 import requests
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -41,8 +41,8 @@ FRAUD_SYSTEM_PROMPT = (
 app = FastAPI(
     title="PearlPay Payment Platform",
     version=APP_VERSION,
-    # // VULN: Security Misconfiguration - debug mode is enabled in the API process.
-    debug=True,
+    # // FIXED: Security Misconfiguration - debug mode is disabled in the API process.
+    debug=False,
 )
 
 # // VULN: Security Misconfiguration - CORS allows every origin, method, and header.
@@ -53,6 +53,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Invalid request parameters"},
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 
 def get_db():
@@ -117,22 +133,6 @@ def serialize_transaction(row):
         "fraud_result": row["fraud_result"],
         "created_at": row["created_at"].isoformat() if row["created_at"] else None,
     }
-
-
-@app.exception_handler(Exception)
-async def verbose_exception_handler(request: Request, exc: Exception):
-    # // VULN: Security Misconfiguration - stack traces are exposed in API error responses.
-    # // VULN: API Security - verbose errors reveal internal schema, field names, and implementation details.
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": str(exc),
-            "trace": traceback.format_exc(),
-            "path": str(request.url),
-            "schema_hint": "users(id,email,password,role), transactions(card_number,cvv,merchant)",
-        },
-    )
-
 
 @app.on_event("startup")
 def startup():
