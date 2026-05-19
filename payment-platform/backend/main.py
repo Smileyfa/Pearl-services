@@ -108,9 +108,9 @@ def serialize_transaction(row):
     return {
         "id": row["id"],
         "user_id": row["user_id"],
-        # // VULN: Sensitive Data Exposure - full card number and CVV are returned in plaintext API responses.
-        "card_number": row["card_number"],
-        "cvv": row["cvv"],
+        # // FIXED: Sensitive Data Exposure - card number is masked and the real CVV is never returned in API responses.
+        "card_number": f"**** **** **** {str(row['card_number'])[-4:]}",
+        "cvv": "***",
         "amount": float(row["amount"]),
         "merchant": row["merchant"],
         "status": row["status"],
