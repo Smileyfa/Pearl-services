@@ -106,10 +106,15 @@ def query_db(sql, params=None):
             return []
 
 
-def execute_db(sql):
+def execute_db(sql, params=None):
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql)
+            if params:
+                for index in range(len(params), 0, -1):
+                    sql = sql.replace(f"${index}", "%s")
+                cur.execute(sql, params)
+            else:
+                cur.execute(sql)
             if cur.description:
                 return cur.fetchall()
             return []
@@ -231,14 +236,13 @@ async def register(request: Request):
     email = payload.get("email", "")
     password = payload.get("password", "")
     full_name = payload.get("full_name", "")
-    # // VULN: Mass Assignment - role is accepted from the request body and stored directly.
-    role = payload.get("role", "user")
+    # // FIXED: Mass Assignment - role is never accepted from the request body and new registrations are always users.
+    role = "user"
     sql = (
-        "INSERT INTO users (email, password, full_name, role) VALUES "
-        f"('{sql_literal(email)}', '{sql_literal(password)}', '{sql_literal(full_name)}', '{sql_literal(role)}') "
+        "INSERT INTO users (email, password, full_name, role) VALUES ($1, $2, $3, $4) "
         "RETURNING id, email, full_name, role, created_at"
     )
-    user = execute_db(sql)[0]
+    user = execute_db(sql, (email, password, full_name, role))[0]
     return {"user": dict(user)}
 
 
