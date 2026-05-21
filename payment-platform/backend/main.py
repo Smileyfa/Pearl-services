@@ -71,6 +71,19 @@ async def generic_exception_handler(request, exc):
     )
 
 
+# // FIXED: Security Misconfiguration - middleware adds standard security headers to every HTTP response.
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Server"] = "PearlPay"
+    return response
+
+
 def get_db():
     return psycopg2.connect(DATABASE_URL)
 
