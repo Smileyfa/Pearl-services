@@ -351,10 +351,6 @@ async def add_security_headers(request, call_next):
     return response
 ```
 
-### Evidence
-![Security headers before](./exploit-security-headers-before.png)
-![Security headers fixed](./exploit-security-headers-fixed.png)
-
 ---
 
 ## Fix 9 — Mass Assignment (A-10)
@@ -391,8 +387,8 @@ user = execute_db(sql, (email, password, full_name, role))[0]
 Sent `"role": "admin"` in registration request. Response returned `"role": "user"` — the field was ignored entirely.
 
 ### Evidence
-![Exploit Mass assignment](./exploit-mass-assignment-before.png)
-![Mass assignment fixed](./exploit-mass-assignment-fixed.png)
+![Exploit Mass assignment](./mass-assign/exploit-mass-assignment-before.png)
+![Mass assignment fixed](./mass-assign/exploit-mass-assignment-fixed.png)
 
 ---
 
