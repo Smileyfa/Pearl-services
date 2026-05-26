@@ -101,10 +101,10 @@ if not JWT_SECRET:
 The secret is loaded from the environment at runtime — never stored in source code or git history. The `RuntimeError` ensures the app refuses to start if the secret is missing, rather than running insecurely with no secret.
 
 ### Evidence
-![JWT token exposed](./exploit-jwt-network-token-exposed.png)
-![JWT extracted token](./exploit-jwt-extracted-token.png)
-![JWT admin access](./exploit-jwt-ui-admin-access.png)
-![JWT forged admin access](./forged-jwt-admin-token.png)
+![JWT token exposed](./jwt/exploit-jwt-network-token-exposed.png)
+![JWT extracted token](./jwt/exploit-jwt-extracted-token.png)
+![JWT admin access](./jwt/exploit-jwt-ui-admin-access.png)
+![JWT forged admin access](./jwt/forged-jwt-admin-token.png)
 
 ---
 
@@ -157,7 +157,7 @@ The endpoint now requires a valid JWT token with `role: admin`. A missing token,
 | Forged admin token | ✅ Full access | ✅ Still works (Phase 6) |
 
 ### Evidence
-![Access control fixed](./exploit-access-control-fixed.png)
+![Access control fixed](./bac/exploit-access-control-fixed.png)
 
 ---
 
@@ -198,8 +198,8 @@ rows = query_db(
 The `AND user_id = $2` clause means the database only returns the transaction if it belongs to the requesting user. Even knowing transaction ID 3 exists, User 1 gets a 404 because the ownership check fails.
 
 ### Evidence
-![IDOR exploit](./exploit-idor-before.png)
-![IDOR fixed](./idor-after-fix.png)
+![IDOR exploit](./idor/exploit-idor-before.png)
+![IDOR fixed](./idor/idor-after-fix.png)
 
 ---
 
@@ -241,10 +241,10 @@ Returned full card numbers and CVVs for all transactions.
 Only the last 4 digits of the card number are returned — sufficient for display purposes. CVV is replaced with `***` and never returned under any circumstances. This matches the industry standard used by every legitimate payment processor.
 
 ### Evidence
-![Sensitive data exploit](./exploit-sensitive-data-before.png)
-![Sensitive data console](./exploit-sensitive-data-console.png)
-![Sensitive data console fixed](./exploit-sensitive-data-console-fix.png)
-![Sensitive data fixed](./exploit-sensitive-data-fixed.png)
+![Sensitive data exploit](./sens.%20data/exploit-sensitive-data-before.png)
+![Sensitive data console](./sens.%20data/exploit-sensitive-data-console.png)
+![Sensitive data console fixed](./sens.%20data/exploit-sensitive-data-console-fixed.png)
+![Sensitive data fixed](./sens.%20data/exploit-sensitive-data-fixed.png)
 
 ---
 
@@ -280,8 +280,8 @@ async def generic_exception_handler(request, exc):
 ```
 
 ### Evidence
-![Debug mode exploit](./exploit-debug-mode-ui.png)
-![Debug mode fixed](./exploit-debug-mode-fixed.png)
+![Debug mode exploit](./debug/exploit-debug-mode-ui.png)
+![Debug mode fixed](./debug/exploit-debug-mode-fixed.png)
 
 ---
 
