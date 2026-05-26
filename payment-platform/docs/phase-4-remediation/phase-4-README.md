@@ -391,6 +391,7 @@ user = execute_db(sql, (email, password, full_name, role))[0]
 Sent `"role": "admin"` in registration request. Response returned `"role": "user"` — the field was ignored entirely.
 
 ### Evidence
+![Exploit Mass assignment](./exploit-mass-assignment-before.png)
 ![Mass assignment fixed](./exploit-mass-assignment-fixed.png)
 
 ---
