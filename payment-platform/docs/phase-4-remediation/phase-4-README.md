@@ -65,8 +65,8 @@ rows = query_db(sql, (user["sub"], f"%{merchant}%"))
 The `$1`, `$2` placeholders tell the database driver to treat user input as pure data — never as SQL syntax. Even if an attacker types `' OR '1'='1'--` it is stored as a literal string, not executed as a command.
 
 ### Evidence
-![SQL injection exploit](./exploit-sqli-ui-bypass.png)
-![SQL injection fixed](./exploit-sqli-ui-fixed.png)
+![SQL injection exploit](./exploit-sqli-ui-bypass)
+![SQL injection fixed](./exploit-sqli-ui-fixed)
 
 ---
 
