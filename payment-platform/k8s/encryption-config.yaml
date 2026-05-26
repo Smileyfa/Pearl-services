@@ -1,0 +1,18 @@
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  # Encrypt Kubernetes Secret objects before they are written to etcd.
+  # This reduces the impact of an etcd backup, disk, or datastore compromise by avoiding plaintext secret storage.
+  - resources:
+      - secrets
+    providers:
+      # AES-CBC is the primary provider used by the Kubernetes API server for new Secret writes.
+      - aescbc:
+          keys:
+            - name: pearlpay-secrets-key
+              # Replace this placeholder with a base64-encoded 32-byte AES key managed outside the cluster.
+              # Rotate and protect this key carefully; anyone with this key can decrypt the stored Secret data.
+              secret: REPLACE_WITH_BASE64_ENCODED_32_BYTE_KEY
+      # The identity provider is kept last so the API server can still read older unencrypted Secret data
+      # during migration. Remove it after all existing Secrets have been rewritten and encrypted.
+      - identity: {}

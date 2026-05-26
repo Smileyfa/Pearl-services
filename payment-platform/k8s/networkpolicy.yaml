@@ -1,0 +1,67 @@
+# NetworkPolicies enforce least-privilege network access between pods.
+# They reduce lateral movement risk by denying traffic that an application component does not explicitly need.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pearlpay-api-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: pearlpay-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Only frontend pods can call the API.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pearlpay-frontend
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    # The API only needs database and cache access; all other egress is denied.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+# NetworkPolicies also protect frontend pods by limiting inbound traffic and backend access.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pearlpay-frontend-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: pearlpay-frontend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The frontend only accepts HTTP traffic on its application port.
+    - ports:
+        - protocol: TCP
+          port: 5173
+  egress:
+    # The frontend can only call the PearlPay API; all other egress is denied.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pearlpay-api
+      ports:
+        - protocol: TCP
+          port: 8000

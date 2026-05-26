@@ -14,11 +14,13 @@ spec:
       labels:
         app: pearlpay-api
     spec:
-      # // VULN: Kubernetes Security - default service account is used for application pods.
-      serviceAccountName: default
-      # // VULN: Kubernetes Security - application pods run as root.
+      # // FIXED: Kubernetes Security - API pods use a dedicated service account instead of the default service account.
+      serviceAccountName: pearlpay-api-sa
+      # // FIXED: Kubernetes Security - API pods run as a non-root user and group.
       securityContext:
-        runAsUser: 0
+        runAsUser: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
       containers:
         - name: api
           image: pearlpay/backend:latest
@@ -31,10 +33,20 @@ spec:
           env:
             - name: APP_ENV
               value: production
-          # // VULN: Kubernetes Security - main container is privileged.
+          # // FIXED: Kubernetes Security - API container runs without privilege escalation, root filesystem writes, or Linux capabilities.
           securityContext:
-            privileged: true
-          # // VULN: Kubernetes Security - no CPU or memory resource limits are defined.
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # // FIXED: Kubernetes Security - API container has CPU and memory requests and limits defined.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -52,11 +64,13 @@ spec:
       labels:
         app: pearlpay-frontend
     spec:
-      # // VULN: Kubernetes Security - default service account is used for frontend pods.
-      serviceAccountName: default
-      # // VULN: Kubernetes Security - frontend pods run as root.
+      # // FIXED: Kubernetes Security - frontend pods use a dedicated service account instead of the default service account.
+      serviceAccountName: pearlpay-frontend-sa
+      # // FIXED: Kubernetes Security - frontend pods run as a non-root user and group.
       securityContext:
-        runAsUser: 0
+        runAsUser: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
       containers:
         - name: frontend
           image: pearlpay/frontend:latest
@@ -66,7 +80,17 @@ spec:
           env:
             - name: VITE_API_BASE
               value: https://api.pearlpay.example
-          # // VULN: Kubernetes Security - frontend container is privileged.
+          # // FIXED: Kubernetes Security - frontend container runs without privilege escalation, root filesystem writes, or Linux capabilities.
           securityContext:
-            privileged: true
-          # // VULN: Kubernetes Security - no CPU or memory resource limits are defined.
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # // FIXED: Kubernetes Security - frontend container has CPU and memory requests and limits defined.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
