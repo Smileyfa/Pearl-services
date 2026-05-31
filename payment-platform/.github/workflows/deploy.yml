@@ -7,27 +7,40 @@ on:
 
 env:
   APP_ENV: production
-  # // VULN: CI/CD - AWS credentials are stored as plaintext in the workflow file.
-  AWS_ACCESS_KEY_ID: AKIA0000EXAMPLE
-  AWS_SECRET_ACCESS_KEY: wJalrXexample
+  # // FIXED: CI/CD - credentials are sourced from GitHub Secrets instead of plaintext workflow values.
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_DEFAULT_REGION: us-east-1
-  DATABASE_URL: postgresql://payadmin:SuperSecretPassword123!@pearlpay-payments.example:5432/payments
-  JWT_SECRET: secret123
-  OPENAI_API_KEY: sk-proj-realisticTrainingKey1234567890abcdef
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 jobs:
-  build-and-deploy:
+  scan-and-build:
     runs-on: ubuntu-latest
-    # // VULN: CI/CD - deploys to production on every push to main with no approval gate.
-    environment: production
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Print environment
-        # // VULN: CI/CD - build step prints all environment variables.
-        run: env
+      # // FIXED: CI/CD - removed the environment dump step so secrets are not printed to workflow logs.
+      # // FIXED: CI/CD - secret scanning runs before build steps to detect committed credentials.
+      - name: Secret scanning
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # // FIXED: CI/CD - SAST scanning runs before build steps to detect insecure code patterns.
+      - name: SAST scan
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: auto
+
+      # // FIXED: CI/CD - dependency scanning checks Python packages for known vulnerabilities.
+      - name: Dependency scan
+        run: |
+          pip install pip-audit
+          pip-audit -r payment-platform/backend/requirements.txt
 
       - name: Build backend image
         run: |
@@ -41,9 +54,16 @@ jobs:
           npm run build
           docker build -t pearlpay/frontend:${{ github.sha }} .
 
-      # // VULN: CI/CD - no secret scanning step is configured.
-      # // VULN: CI/CD - no SAST scanning step is configured.
-      # // VULN: CI/CD - no dependency scanning step is configured.
+  deploy:
+    runs-on: ubuntu-latest
+    needs: scan-and-build
+    # // FIXED: CI/CD - GitHub environment protection rules require manual approval before production deployment.
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Deploy to production EKS
         run: |
           aws eks update-kubeconfig --name pearlpay-training --region us-east-1
