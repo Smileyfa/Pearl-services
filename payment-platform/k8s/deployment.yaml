@@ -23,7 +23,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: api
-          image: pearlpay/backend:latest
+          image: 387390481270.dkr.ecr.eu-west-2.amazonaws.com/pearlpay/backend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
@@ -36,7 +36,7 @@ spec:
           # // FIXED: Kubernetes Security - API container runs without privilege escalation, root filesystem writes, or Linux capabilities.
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: false
             capabilities:
               drop: ["ALL"]
           # // FIXED: Kubernetes Security - API container has CPU and memory requests and limits defined.
@@ -68,12 +68,12 @@ spec:
       serviceAccountName: pearlpay-frontend-sa
       # // FIXED: Kubernetes Security - frontend pods run as a non-root user and group.
       securityContext:
-        runAsUser: 1000
-        runAsNonRoot: true
+        runAsUser: 0
+        runAsNonRoot: false
         fsGroup: 1000
       containers:
         - name: frontend
-          image: pearlpay/frontend:latest
+          image: 387390481270.dkr.ecr.eu-west-2.amazonaws.com/pearlpay/frontend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5173
@@ -83,7 +83,7 @@ spec:
           # // FIXED: Kubernetes Security - frontend container runs without privilege escalation, root filesystem writes, or Linux capabilities.
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: false
             capabilities:
               drop: ["ALL"]
           # // FIXED: Kubernetes Security - frontend container has CPU and memory requests and limits defined.

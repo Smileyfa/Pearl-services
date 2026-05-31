@@ -21,6 +21,14 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
+    # Allow ingress controller traffic to reach the API service port.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
   egress:
     # The API only needs database and cache access; all other egress is denied.
     - to:
@@ -54,6 +62,14 @@ spec:
   ingress:
     # The frontend only accepts HTTP traffic on its application port.
     - ports:
+        - protocol: TCP
+          port: 5173
+    # Allow ingress controller traffic to reach the frontend service port.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
         - protocol: TCP
           port: 5173
   egress:
