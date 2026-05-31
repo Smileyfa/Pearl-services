@@ -1,0 +1,4 @@
+# These are intentionally vulnerable training files and are excluded from Semgrep scans.
+payment-platform/.env
+payment-platform/docs/
+payment-platform/terraform/main.tf
