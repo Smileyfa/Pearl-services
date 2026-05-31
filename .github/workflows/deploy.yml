@@ -1,0 +1,70 @@
+name: PearlPay Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  APP_ENV: production
+  # // FIXED: CI/CD - credentials are sourced from GitHub Secrets instead of plaintext workflow values.
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: us-east-1
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+jobs:
+  scan-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # // FIXED: CI/CD - removed the environment dump step so secrets are not printed to workflow logs.
+      # // FIXED: CI/CD - secret scanning runs before build steps to detect committed credentials.
+      - name: Secret scanning
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # // FIXED: CI/CD - SAST scanning runs before build steps to detect insecure code patterns.
+      - name: SAST scan
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: auto
+
+      # // FIXED: CI/CD - dependency scanning checks Python packages for known vulnerabilities.
+      - name: Dependency scan
+        run: |
+          pip install pip-audit
+          pip-audit -r payment-platform/backend/requirements.txt
+
+      - name: Build backend image
+        run: |
+          cd payment-platform/backend
+          docker build -t pearlpay/backend:${{ github.sha }} .
+
+      - name: Build frontend image
+        run: |
+          cd payment-platform/frontend
+          npm install
+          npm run build
+          docker build -t pearlpay/frontend:${{ github.sha }} .
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: scan-and-build
+    # // FIXED: CI/CD - GitHub environment protection rules require manual approval before production deployment.
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to production EKS
+        run: |
+          aws eks update-kubeconfig --name pearlpay-training --region us-east-1
+          kubectl apply -f payment-platform/k8s/
