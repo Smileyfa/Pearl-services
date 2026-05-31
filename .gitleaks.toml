@@ -1,0 +1,9 @@
+# WARNING: This allowlist exists only because this is an intentionally vulnerable
+# training repository. Never copy these exclusions into a real project.
+
+[allowlist]
+paths = [
+  '''(^|.*[\\/])payment-platform[\\/]\.env$''',
+  '''(^|.*[\\/])docs[\\/].*''',
+  '''docker-compose\.yml''',
+]
