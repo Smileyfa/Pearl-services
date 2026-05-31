@@ -2,3 +2,5 @@ frontend/node_modules/
 frontend/dist/
 backend/__pycache__/
 .pytest_cache/
+payment-platform/terraform/.terraform/
+payment-platform/terraform/.terraform.lock.hcl
