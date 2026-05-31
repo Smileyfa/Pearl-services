@@ -16,13 +16,57 @@ services:
     ports:
       - "6379:6379"
 
+  # Development-only Vault. Never use Vault dev mode in production because it stores data in memory and uses a static root token.
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: payment-platform-vault
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "sh", "-c", "VAULT_ADDR=http://0.0.0.0:8200 vault status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  vault-init:
+    image: hashicorp/vault:1.15
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-root-token
+    command:
+      - sh
+      - -c
+      - |
+        vault secrets enable -path=secret kv-v2 || true
+        vault kv put secret/pearlpay \
+          database_url='postgresql://payadmin:SuperSecretPassword123!@postgres:5432/payments' \
+          jwt_secret='aX9kL2mP5nQ8rT1uW4vY7zA3bC6dE0fG' \
+          redis_password='redis-P@ssw0rd-Prod' \
+          openai_api_key='sk-proj-realisticTrainingKey1234567890abcdef'
+        echo "Vault initialised"
+
   backend:
     build: ./backend
     env_file:
       - .env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      vault:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
     volumes:

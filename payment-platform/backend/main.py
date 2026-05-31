@@ -2,6 +2,7 @@ import json
 import os
 import random
 import time
+import warnings
 from datetime import datetime
 
 import jwt
@@ -14,29 +15,47 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# // VULN: Secret Management - database credentials are hardcoded directly in source code.
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://payadmin:SuperSecretPassword123!@postgres:5432/payments",
-)
+from vault_client import load_secrets
+
+# Load secrets from Vault into environment before reading any os.environ values.
+_secrets_loaded = load_secrets()
+
+# // FIXED: Secret Management - database credentials are loaded from the DATABASE_URL environment variable.
+DATABASE_URL = os.environ.get("DATABASE_URL")
 # // FIXED: Broken Authentication - JWT secret is loaded from the JWT_SECRET environment variable instead of a hardcoded weak value.
 JWT_SECRET = os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError("JWT_SECRET environment variable is not set. Refusing to start.")
-# // VULN: Secret Management - OpenAI API key is hardcoded directly in source code.
-OPENAI_API_KEY = "sk-proj-realisticTrainingKey1234567890"
-# // VULN: Secret Management - dummy AWS access key is hardcoded directly in source code.
-AWS_ACCESS_KEY_ID = "AKIA0000EXAMPLE"
-# // VULN: Secret Management - dummy AWS secret key is hardcoded directly in source code.
-AWS_SECRET_ACCESS_KEY = "wJalrXexample"
-# // VULN: Secret Management - Redis password is hardcoded directly in source code.
-REDIS_PASSWORD = "redis-P@ssw0rd-Prod"
+# // FIXED: Secret Management - OpenAI API key is loaded from the OPENAI_API_KEY environment variable.
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+# // FIXED: Secret Management - AWS access key is loaded from the AWS_ACCESS_KEY_ID environment variable.
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+# // FIXED: Secret Management - AWS secret key is loaded from the AWS_SECRET_ACCESS_KEY environment variable.
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+# // FIXED: Secret Management - Redis password is loaded from the REDIS_PASSWORD environment variable.
+REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD")
 APP_VERSION = "1.0.0-vulnerable"
 ENVIRONMENT = os.getenv("APP_ENV", "development")
 FRAUD_SYSTEM_PROMPT = (
     "You are RiskOracle, a payment fraud analyst. Review transactions and return "
     "a short risk decision with operational details."
 )
+
+required_secrets = {
+    "JWT_SECRET": JWT_SECRET,
+    "DATABASE_URL": DATABASE_URL,
+    "REDIS_PASSWORD": REDIS_PASSWORD,
+}
+missing_required_secrets = [name for name, value in required_secrets.items() if not value]
+if missing_required_secrets:
+    raise RuntimeError(f"Missing required environment variables: {', '.join(missing_required_secrets)}")
+
+optional_secrets = {
+    "OPENAI_API_KEY": OPENAI_API_KEY,
+    "AWS_ACCESS_KEY_ID": AWS_ACCESS_KEY_ID,
+    "AWS_SECRET_ACCESS_KEY": AWS_SECRET_ACCESS_KEY,
+}
+for secret_name, secret_value in optional_secrets.items():
+    if not secret_value:
+        warnings.warn(f"Optional environment variable {secret_name} is not set", RuntimeWarning)
 
 app = FastAPI(
     title="PearlPay Payment Platform",
