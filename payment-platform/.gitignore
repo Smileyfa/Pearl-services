@@ -4,3 +4,5 @@ backend/__pycache__/
 .pytest_cache/
 payment-platform/terraform/.terraform/
 payment-platform/terraform/.terraform.lock.hcl
+terraform/.terraform/
+terraform/.terraform.lock.hcl
