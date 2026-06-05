@@ -8,7 +8,7 @@ metadata:
     kubernetes.io/ingress.class: nginx
 spec:
   rules:
-    - host: app.pearlpay.example
+    - host: pearlpay.pearlservices.co.uk
       http:
         paths:
           - path: /
@@ -18,7 +18,7 @@ spec:
                 name: pearlpay-frontend
                 port:
                   number: 80
-    - host: api.pearlpay.example
+    - host: api.pearlpay.pearlservices.co.uk
       http:
         paths:
           - path: /
@@ -28,13 +28,3 @@ spec:
                 name: pearlpay-api
                 port:
                   number: 8000
-    - host: admin.pearlpay.example
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: pearlpay-admin-dashboard
-                port:
-                  number: 80

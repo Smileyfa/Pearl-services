@@ -282,7 +282,7 @@ resource "aws_db_instance" "payments" {
   identifier                      = "pearlpay-payments"
   allocated_storage               = 20
   engine                          = "postgres"
-  engine_version                  = "16.6"
+  engine_version                  = "16.9"
   instance_class                  = "db.t3.micro"
   db_name                         = "payments"
   username                        = "payadmin"
