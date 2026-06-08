@@ -308,7 +308,7 @@ async def login(request: Request):
         except ValueError:
             password_matches = False
     if not users or not password_matches:
-        raise HTTPException(status_code=401, detail="Invalid email/password for users.password")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
     user = users[0]
     session_token = create_weak_session_token(user["id"])
     token = jwt.encode(
