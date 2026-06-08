@@ -16,6 +16,8 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.middleware import SlowAPIMiddleware
 
 from vault_client import load_secrets
 
@@ -34,6 +36,7 @@ AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 # // FIXED: Secret Management - Redis password is loaded from the REDIS_PASSWORD environment variable.
 REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD")
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET")
 APP_VERSION = "1.0.0-vulnerable"
 ENVIRONMENT = os.getenv("APP_ENV", "development")
 FRAUD_SYSTEM_PROMPT = (
@@ -45,6 +48,7 @@ required_secrets = {
     "JWT_SECRET": JWT_SECRET,
     "DATABASE_URL": DATABASE_URL,
     "REDIS_PASSWORD": REDIS_PASSWORD,
+    "WEBHOOK_SECRET": WEBHOOK_SECRET,
 }
 missing_required_secrets = [name for name, value in required_secrets.items() if not value]
 if missing_required_secrets:
@@ -65,15 +69,21 @@ app = FastAPI(
     # // FIXED: Security Misconfiguration - debug mode is disabled in the API process.
     debug=False,
 )
+limiter = Limiter(
+    key_func=lambda request: request.client.host if request.client else "unknown",
+    default_limits=["100/minute"],
+)
+app.state.limiter = limiter
 
 # // FIXED: Security Misconfiguration - CORS is restricted to the frontend origin, allowed methods, and required headers.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://pearlpay.pearlservices.co.uk"],
+    allow_origins=["https://pearlpay.pearlservices.co.uk"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
+app.add_middleware(SlowAPIMiddleware)
 
 
 @app.exception_handler(RequestValidationError)
@@ -214,8 +224,8 @@ def startup():
                     cur.execute("SELECT COUNT(*) FROM users")
                     user_count = cur.fetchone()[0]
                     if user_count == 0:
-                        ava_password = bcrypt.hashpw("password123".encode(), bcrypt.gensalt()).decode()
-                        admin_password = bcrypt.hashpw("admin123".encode(), bcrypt.gensalt()).decode()
+                        ava_password = bcrypt.hashpw("password123".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+                        admin_password = bcrypt.hashpw("admin123".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
                         cur.execute(
                             """
                             INSERT INTO users (email, password, full_name, role)
@@ -272,16 +282,17 @@ async def register(request: Request):
     # // FIXED: Mass Assignment - role is never accepted from the request body and new registrations are always users.
     role = "user"
     # // FIXED: Broken Authentication - passwords are hashed with bcrypt before being stored.
-    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     sql = (
         "INSERT INTO users (email, password, full_name, role) VALUES ($1, $2, $3, $4) "
         "RETURNING id, email, full_name, role, created_at"
     )
-    user = execute_db(sql, (email, password_hash, full_name, role))[0]
+    user = execute_db(sql, (email, hashed, full_name, role))[0]
     return {"user": dict(user)}
 
 
 @app.post("/api/login")
+@limiter.limit("5/minute")
 async def login(request: Request):
     payload = await request.json()
     email = payload.get("email", "")
@@ -293,7 +304,7 @@ async def login(request: Request):
     password_matches = False
     if users:
         try:
-            password_matches = bcrypt.checkpw(password.encode(), users[0]["password"].encode())
+            password_matches = bcrypt.checkpw(password.encode("utf-8"), users[0]["password"].encode("utf-8"))
         except ValueError:
             password_matches = False
     if not users or not password_matches:
@@ -374,7 +385,9 @@ def admin_transactions(authorization: str | None = Header(default=None)):
 
 
 @app.post("/api/webhooks/merchant")
-async def receive_merchant_webhook(request: Request):
+async def receive_merchant_webhook(request: Request, x_webhook_secret: str | None = Header(default=None)):
+    if x_webhook_secret != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid webhook secret")
     payload = await request.json()
     # // FIXED: SQL Injection - webhook insert uses parameterised placeholders instead of raw string concatenation.
     sql = (
