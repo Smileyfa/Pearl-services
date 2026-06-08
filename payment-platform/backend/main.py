@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import secrets
 import time
 import warnings
 from datetime import datetime
@@ -67,7 +68,7 @@ app = FastAPI(
 # // FIXED: Security Misconfiguration - CORS is restricted to the frontend origin, allowed methods, and required headers.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "https://pearlpay.pearlservices.co.uk"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
@@ -153,8 +154,8 @@ def decode_user(authorization: str | None):
 
 
 def create_weak_session_token(user_id):
-    # // VULN: Broken Authentication - session token is short and predictable from user ID and timestamp.
-    return f"sess-{user_id}-{int(time.time())}"
+    # // FIXED: Broken Authentication - session token is generated with cryptographically secure randomness.
+    return secrets.token_hex(32)
 
 
 def serialize_transaction(row):
