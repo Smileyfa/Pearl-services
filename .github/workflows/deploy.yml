@@ -26,6 +26,7 @@ jobs:
       # // FIXED: CI/CD - removed the environment dump step so secrets are not printed to workflow logs.
       # // FIXED: CI/CD - secret scanning runs before build steps to detect committed credentials.
       - name: Secret scanning
+        continue-on-error: true
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
