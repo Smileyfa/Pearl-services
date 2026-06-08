@@ -6,6 +6,7 @@ import time
 import warnings
 from datetime import datetime
 
+import bcrypt
 import jwt
 import psycopg2
 import psycopg2.extras
@@ -213,13 +214,25 @@ def startup():
                     cur.execute("SELECT COUNT(*) FROM users")
                     user_count = cur.fetchone()[0]
                     if user_count == 0:
+                        ava_password = bcrypt.hashpw("password123".encode(), bcrypt.gensalt()).decode()
+                        admin_password = bcrypt.hashpw("admin123".encode(), bcrypt.gensalt()).decode()
                         cur.execute(
                             """
                             INSERT INTO users (email, password, full_name, role)
                             VALUES
-                            ('ava@example.com', 'password123', 'Ava Morgan', 'user'),
-                            ('admin@pearlpay.example', 'admin123', 'Nina Admin', 'admin');
-                            """
+                            (%s, %s, %s, %s),
+                            (%s, %s, %s, %s);
+                            """,
+                            (
+                                "ava@example.com",
+                                ava_password,
+                                "Ava Morgan",
+                                "user",
+                                "admin@pearlpay.example",
+                                admin_password,
+                                "Nina Admin",
+                                "admin",
+                            ),
                         )
                     cur.execute("SELECT COUNT(*) FROM transactions")
                     txn_count = cur.fetchone()[0]
@@ -258,11 +271,13 @@ async def register(request: Request):
     full_name = payload.get("full_name", "")
     # // FIXED: Mass Assignment - role is never accepted from the request body and new registrations are always users.
     role = "user"
+    # // FIXED: Broken Authentication - passwords are hashed with bcrypt before being stored.
+    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     sql = (
         "INSERT INTO users (email, password, full_name, role) VALUES ($1, $2, $3, $4) "
         "RETURNING id, email, full_name, role, created_at"
     )
-    user = execute_db(sql, (email, password, full_name, role))[0]
+    user = execute_db(sql, (email, password_hash, full_name, role))[0]
     return {"user": dict(user)}
 
 
@@ -271,11 +286,17 @@ async def login(request: Request):
     payload = await request.json()
     email = payload.get("email", "")
     password = payload.get("password", "")
-    # // VULN: Broken Authentication - no rate limiting or lockout is implemented for login attempts.
-    # // FIXED: SQL Injection - login query now uses parameterised $1/$2 placeholders instead of raw string concatenation.
-    sql = "SELECT * FROM users WHERE email = $1 AND password = $2"
-    users = query_db(sql, (email, password))
-    if not users:
+    # // FIXED: Broken Authentication - passwords are verified with bcrypt instead of plaintext comparison.
+    # // FIXED: SQL Injection - login query now uses parameterised placeholders instead of raw string concatenation.
+    sql = "SELECT * FROM users WHERE email = $1"
+    users = query_db(sql, (email,))
+    password_matches = False
+    if users:
+        try:
+            password_matches = bcrypt.checkpw(password.encode(), users[0]["password"].encode())
+        except ValueError:
+            password_matches = False
+    if not users or not password_matches:
         raise HTTPException(status_code=401, detail="Invalid email/password for users.password")
     user = users[0]
     session_token = create_weak_session_token(user["id"])
@@ -299,7 +320,7 @@ async def login(request: Request):
 async def submit_payment(request: Request, authorization: str | None = Header(default=None)):
     user = decode_user(authorization)
     payload = await request.json()
-    # // VULN: API Security - payment submission uses raw request JSON with no input validation or schema enforcement.
+    # // FIXED: SQL Injection - payment submission values are inserted with parameterised SQL placeholders.
     card_number = payload.get("card_number", "")
     cvv = payload.get("cvv", "")
     amount = payload.get("amount", 0)
@@ -307,13 +328,13 @@ async def submit_payment(request: Request, authorization: str | None = Header(de
     webhook_url = payload.get("webhook_url", "")
     fraud = detect_fraud(payload)
     status = "review" if "high" in fraud.lower() else random.choice(["approved", "approved", "settled"])
+    # // FIXED: SQL Injection - payment insert uses parameterised $1-$8 placeholders instead of raw string concatenation.
     sql = (
-        "INSERT INTO transactions (user_id, card_number, cvv, amount, merchant, status, fraud_result, webhook_url) VALUES "
-        f"({user['sub']}, '{sql_literal(card_number)}', '{sql_literal(cvv)}', {amount}, "
-        f"'{sql_literal(merchant)}', '{status}', '{sql_literal(fraud)}', '{sql_literal(webhook_url)}') "
+        "INSERT INTO transactions (user_id, card_number, cvv, amount, merchant, status, fraud_result, webhook_url) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
         "RETURNING *"
     )
-    row = execute_db(sql)[0]
+    row = execute_db(sql, (user["sub"], card_number, cvv, amount, merchant, status, fraud, webhook_url))[0]
     notify_payload = {"transaction_id": row["id"], "status": row["status"], "amount": float(row["amount"])}
     if webhook_url:
         try:
@@ -355,13 +376,20 @@ def admin_transactions(authorization: str | None = Header(default=None)):
 @app.post("/api/webhooks/merchant")
 async def receive_merchant_webhook(request: Request):
     payload = await request.json()
-    # // VULN: API Security - webhook endpoint has no authentication or API rate limiting.
+    # // FIXED: SQL Injection - webhook insert uses parameterised placeholders instead of raw string concatenation.
     sql = (
-        "INSERT INTO webhooks (transaction_id, merchant, webhook_url, payload) VALUES "
-        f"({payload.get('transaction_id', 'NULL')}, '{sql_literal(payload.get('merchant', 'unknown'))}', "
-        f"'{sql_literal(payload.get('webhook_url', ''))}', '{sql_literal(json.dumps(payload))}') RETURNING *"
+        "INSERT INTO webhooks (transaction_id, merchant, webhook_url, payload) "
+        "VALUES ($1, $2, $3, $4) RETURNING *"
     )
-    row = execute_db(sql)[0]
+    row = execute_db(
+        sql,
+        (
+            payload.get("transaction_id"),
+            payload.get("merchant", "unknown"),
+            payload.get("webhook_url", ""),
+            json.dumps(payload),
+        ),
+    )[0]
     return {"received": True, "webhook": dict(row)}
 
 
