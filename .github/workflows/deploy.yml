@@ -81,14 +81,18 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: scan-and-build
-    # // FIXED: CI/CD - GitHub environment protection rules require manual approval before production deployment.
     environment: production
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy to production EKS
-        run: |
-          aws eks update-kubeconfig --name pearlpay-training --region us-east-1
-          kubectl apply -f payment-platform/k8s/
+      - name: Deploy to DigitalOcean
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: root
+          key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/Pearl-services/payment-platform
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
+            docker compose ps
