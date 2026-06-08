@@ -112,6 +112,9 @@ function App() {
       const data = await api("/api/admin/transactions?admin=true");
       setAdminTransactions(data.transactions);
     } catch (err) {
+      if (auth?.user?.role !== "admin" && err.message === "Admin role required") {
+        return;
+      }
       setError(err.message);
     }
   }
@@ -205,7 +208,6 @@ function App() {
               <p className="eyebrow">Signed in as {auth.user.email}</p>
               <h2>{auth.user.full_name}</h2>
             </div>
-            <div className="token-box">Session {auth.session_token}</div>
           </div>
 
           <div className="stats-grid">
